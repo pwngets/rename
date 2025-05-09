@@ -10,6 +10,10 @@
 git clone https://github.com/MindednessKind/rename.git
 ```
 
+或者在Release中分开下载
+
+
+
 IDA-Outport-Script.py 是IDA用来导出函数表的脚本
 
 GDB-Import-Script.py 是GDB用来导入函数表的脚本
