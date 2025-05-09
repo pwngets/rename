@@ -47,7 +47,7 @@ rename_import ./.rename
 
 # 实现结果
 
-![Show](.\images\Show.png)
+![Show](/images/Show.png)
 
 测试环境: Ubuntu 24
 
