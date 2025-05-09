@@ -4,7 +4,7 @@ import idc
 import sys
 
 # 默认输出路径，可根据需要修改
-DEFAULT_OUTPUT_PATH = r"C:\Users\86183\Desktop\.rename.txt"
+DEFAULT_OUTPUT_PATH = r".\.rename"
 
 # 要过滤的前缀列表，如以 'sub' 开头的函数名将被排除
 FILTER_PREFIXES = ['sub']
