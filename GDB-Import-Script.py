@@ -2,6 +2,7 @@ import gdb
 import argparse
 import pwndbg.commands
 import subprocess
+import os
 
 try:
     import pwndbg.gdblib.symbol as symbol
@@ -12,21 +13,28 @@ except ImportError:
     import pwndbg.proc as proc
     import pwndbg.elf as elf
 
-import os
-
+# 存储用户的符号和断点
 user_symbols = {}
 user_breakpoints = {}
 
+# 保存原始的symbol.get方法
 original_symbol_get = symbol.get
 
-SAVE_FILE = '.rename.txt'
-BREAKPOINT_FILE = '.rename_breakpoints.txt'
+# 文件路径
+SAVE_FILE = '.rename'
+BREAKPOINT_FILE = '.rename_breakpoints'
 
+# 重新定义获取符号的方法，支持偏移显示
 def renamed_symbol_get(address, *a, **kw):
     if address in user_symbols:
-        return user_symbols[address]
+        name = user_symbols[address]
+        if '+' in name:
+            function_name, offset = name.split('+')
+            return f"{function_name}+{offset}"  # 显示函数名和偏移
+        return name  # 如果没有偏移，返回原符号名
     return original_symbol_get(address, *a, **kw)
 
+# 安装和卸载符号钩子
 def install_hook():
     symbol.get = renamed_symbol_get
 
@@ -35,6 +43,7 @@ def uninstall_hook():
     user_symbols.clear()
     user_breakpoints.clear()
 
+# 检查是否为PIE（位置无关执行文件）
 def is_pie():
     try:
         result = subprocess.run(['checksec', '--fortify-file', '--pie'], capture_output=True, text=True)
@@ -44,6 +53,7 @@ def is_pie():
         print("[!] checksec not found, cannot verify PIE status.")
     return False
 
+# 获取PIE基址
 def get_pie_base():
     if is_pie():
         try:
@@ -65,40 +75,42 @@ def get_pie_base():
             return 0
     return 0
 
+# 修复地址（考虑PIE基址）
 def fix_address(addr):
     pie_base = get_pie_base()
     if pie_base:
         if addr >= pie_base:
             return addr
         else:
-            return addr+pie_base
+            return addr + pie_base
 
+# 获取绝对地址
 def get_absolute_address(addr):
     pie_base = get_pie_base()
     if pie_base:
         if addr >= pie_base:
             return addr
         else:
-            return addr+pie_base
+            return addr + pie_base
 
-parser = argparse.ArgumentParser(description='Rename an address to a function name.')
-parser.add_argument('address', type=str, help='Address (e.g., 0x401000 or 0x1234)')
-parser.add_argument('name', type=str, help='New function name')
-parser.add_argument('-b', '--breakpoint', action='store_true', help='Set breakpoint after renaming')
+# 解析符号文件并生成符号列表
+def parse_symbol_file(path):
+    symbols = []
+    with open(path, 'r') as f:
+        for line in f:
+            if not line.strip() or line.startswith("#"):
+                continue
+            parts = line.strip().split()
+            if len(parts) < 3:
+                continue
+            start = fix_address(int(parts[0], 16))
+            end = fix_address(int(parts[1], 16))
+            name = parts[2]
+            size = end - start
+            symbols.append((name, start, size))
+    return symbols
 
-@pwndbg.commands.ArgparsedCommand(parser)
-def rename(address, name, breakpoint):
-    try:
-        addr = int(address, 0)
-        adjusted_addr = fix_address(addr)
-        user_symbols[adjusted_addr] = name
-        print(f'✓ Renamed 0x{adjusted_addr:x} -> {name}')
-        if breakpoint:
-            gdb.execute(f'b *{hex(adjusted_addr)}')
-            user_breakpoints[adjusted_addr] = name
-            print(f'✓ Breakpoint set at {name} (address 0x{adjusted_addr:x})')
-    except Exception as e:
-        print(f'[!] Failed to rename: {e}')
+# 导入符号并显示带偏移的符号
 @pwndbg.commands.Command
 def rename_import(file):
     try:
@@ -110,11 +122,22 @@ def rename_import(file):
                 if len(parts) < 2:
                     print(f'[!] Invalid line: {line.strip()}')
                     continue
-                addr_str, name = parts[0], parts[1]
-                addr = int(addr_str, 0)
-                addr = fix_address(addr) 
-                user_symbols[addr] = name
-                print(f'✓ Imported: 0x{addr:x} -> {name}')
+                if len(parts) >= 3:
+                    start_str, end_str, name = parts[0], parts[1], parts[2]
+                    start = fix_address(int(start_str, 0))
+                    end = fix_address(int(end_str, 0))
+                    for a in range(start, end):
+                        user_symbols[a] = f"{name}+0x{a - start:x}"
+                    user_symbols[start] = name
+                    print(f"✓ imported {name} ({start:#x} - {end:#x})")
+                elif len(parts) == 2:
+                    addr_str, name = parts[0], parts[1]
+                    addr = fix_address(int(addr_str, 0))
+                    user_symbols[addr] = name
+                    print(f"✓ imported {name} at {addr:#x}")
+                else:
+                    print(f"[!] Invalid line format: {line}")
+                # 设置断点
                 if len(parts) > 2 and parts[2] == '#bp':
                     abs_addr = get_absolute_address(addr)
                     gdb.execute(f'b *{hex(abs_addr)}')
@@ -123,6 +146,7 @@ def rename_import(file):
     except Exception as e:
         print(f'[!] Failed to import: {e}')
 
+# 保存符号重命名
 @pwndbg.commands.Command
 def rename_save():
     try:
@@ -132,12 +156,16 @@ def rename_save():
         print(f'✓ Saved to {SAVE_FILE}')
     except Exception as e:
         print(f'[!] Failed to save: {e}')
+
+# 加载符号重命名
 @pwndbg.commands.Command
 def rename_load():
     if not os.path.exists(SAVE_FILE):
         print(f'[!] {SAVE_FILE} not found')
         return
     rename_import(SAVE_FILE)
+
+# 显示重命名的符号
 @pwndbg.commands.Command
 def rename_list():
     if not user_symbols:
@@ -145,6 +173,8 @@ def rename_list():
     for addr, name in sorted(user_symbols.items()):
         breakpoint_status = 'with breakpoint' if addr in user_breakpoints else 'no breakpoint'
         print(f'0x{addr:x}: {name} ({breakpoint_status})')
+
+# 删除符号重命名
 @pwndbg.commands.Command
 def rename_delete(addr):
     try:
@@ -160,8 +190,12 @@ def rename_delete(addr):
             print(f'[!] No rename for 0x{addr:x}')
     except Exception as e:
         print(f'[!] Failed to delete: {e}')
+
+# 卸载钩子
 @pwndbg.commands.Command
 def rename_uninstall():
     uninstall_hook()
     print('Rename hooks uninstalled.')
+
+# 安装符号钩子
 install_hook()
