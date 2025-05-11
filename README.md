@@ -2,7 +2,7 @@
 
 修改自 _gets佬的 rename插件，实现了在gdb中的 **func_name + offset** 的显示 (现在以十进制显示，与pwndbg显示方式一致)
 
-如果要十六进制的显示，可以前往 HexShow分支下载.
+如果要十六进制的显示，可以在脚本中切换显示方法
 
 膜拜_gets佬,从小看gets佬wp长大的(bushi
 
