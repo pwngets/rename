@@ -2,6 +2,12 @@
 
 修改自 _gets佬的 rename插件，实现了在gdb中的 **func_name + offset** 的显示 (现在以十进制显示，与pwndbg显示方式一致)
 
+如果要十六进制的显示，可以前往 HexShow分支下载.
+
+膜拜_gets佬,从小看gets佬wp长大的(bushi
+
+Orz
+
 # 下载方法
 
 找到你想要放置插件的位置，运行
@@ -55,4 +61,4 @@ rename_import ./.rename
 
 代码实现：pwngets
 
-修改: 念落
+README Edit: 念落
