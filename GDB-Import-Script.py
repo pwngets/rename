@@ -13,6 +13,10 @@ except ImportError:
     import pwndbg.proc as proc
     import pwndbg.elf as elf
 
+#用来缓存pie地址与pie是否开启，无需每次都调用命令
+pie_addr : int|None = None
+is_pie_enabled : bool|None = None
+
 # 存储用户的符号和断点
 user_symbols = {}
 user_breakpoints = {}
@@ -45,17 +49,25 @@ def uninstall_hook():
 
 # 检查是否为PIE（位置无关执行文件）
 def is_pie():
+    global is_pie_enabled
+    if is_pie_enabled != None:
+        return is_pie_enabled
     try:
         result = subprocess.run(['checksec', '--fortify-file', '--pie'], capture_output=True, text=True)
         if "No PIE" not in result.stdout:
+            is_pie_enabled = True
             return True
     except FileNotFoundError:
         print("[!] checksec not found, cannot verify PIE status.")
+    is_pie_enabled = False
     return False
 
 # 获取PIE基址
 def get_pie_base():
+    global pie_addr
     if is_pie():
+        if pie_addr != None:
+            return pie_addr
         try:
             result = gdb.execute('piebase', to_string=True).strip()
             if result:
@@ -63,7 +75,8 @@ def get_pie_base():
                 match = re.search(r'0x[0-9a-fA-F]+', result)
                 if match:
                     pie_base = match.group(0)
-                    return int(pie_base, 16)
+                    pie_addr = int(pie_base, 16)
+                    return pie_addr
                 else:
                     print("[!] Error: Unable to extract PIE base address from the output.")
                     return 0
