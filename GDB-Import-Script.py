@@ -135,7 +135,7 @@ def rename_import(file):
                 if len(parts) < 2:
                     print(f'[!] Invalid line: {line.strip()}')
                     continue
-                if len(parts) >= 3:
+                if len(parts) >= 3 and parts[2] != '#bp':
                     start_str, end_str, name = parts[0], parts[1], parts[2]
                     start = fix_address(int(start_str, 0))
                     end = fix_address(int(end_str, 0))
@@ -149,14 +149,14 @@ def rename_import(file):
                     addr = fix_address(int(addr_str, 0))
                     user_symbols[addr] = name
                     print(f"✓ imported {name} at {addr:#x}")
-                else:
-                    print(f"[!] Invalid line format: {line}")
                 # 设置断点
-                if len(parts) > 2 and parts[2] == '#bp':
+                elif len(parts) > 2 and parts[2] == '#bp':
                     abs_addr = get_absolute_address(addr)
                     gdb.execute(f'b *{hex(abs_addr)}')
                     user_breakpoints[addr] = name
                     print(f'✓ Breakpoint set at {name} (address 0x{abs_addr:x})')
+                else:
+                    print(f"[!] Invalid line format: {line}")
     except Exception as e:
         print(f'[!] Failed to import: {e}')
 
