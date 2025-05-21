@@ -127,7 +127,8 @@ def rename_import(file):
                     start = fix_address(int(start_str, 0))
                     end = fix_address(int(end_str, 0))
                     for a in range(start, end):
-                        user_symbols[a] = f"{name}+0x{a - start:x}"
+                        user_symbols[a] = f"{name}+{a - start}" # 10 进制显示方法
+                        # user_symbols[a] = f"{name}+0x{a - start :x}" # 16进制显示方法
                     user_symbols[start] = name
                     print(f"✓ imported {name} ({start:#x} - {end:#x})")
                 elif len(parts) == 2:
