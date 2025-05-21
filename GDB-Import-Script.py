@@ -132,10 +132,25 @@ def rename_import(file):
                 if not line.strip() or line.startswith("#"):
                     continue
                 parts = line.strip().split()
+                
+                #小于2 parts，不合法，直接返回
                 if len(parts) < 2:
                     print(f'[!] Invalid line: {line.strip()}')
                     continue
-                if len(parts) >= 3:
+                
+                #根据parts数量选择分支处理
+                if len(parts) == 2:                             #for addr+name format
+                    addr_str, name = parts[0], parts[1]
+                    addr = fix_address(int(addr_str, 0))
+                    user_symbols[addr] = name
+                    print(f"✓ imported {name} at {addr:#x}")
+                # 设置断点
+                elif len(parts) == 3 and parts[2] == '#bp':     #for addr+name+"#bp" format
+                    abs_addr = get_absolute_address(addr)
+                    gdb.execute(f'b *{hex(abs_addr)}')
+                    user_breakpoints[addr] = name
+                    print(f'✓ Breakpoint set at {name} (address 0x{abs_addr:x})')
+                elif len(parts) == 3 and parts[2] != '#bp':     #for start_str+end_str+name format
                     start_str, end_str, name = parts[0], parts[1], parts[2]
                     start = fix_address(int(start_str, 0))
                     end = fix_address(int(end_str, 0))
@@ -144,19 +159,8 @@ def rename_import(file):
                         # user_symbols[a] = f"{name}+0x{a - start :x}" # 16进制显示方法
                     user_symbols[start] = name
                     print(f"✓ imported {name} ({start:#x} - {end:#x})")
-                elif len(parts) == 2:
-                    addr_str, name = parts[0], parts[1]
-                    addr = fix_address(int(addr_str, 0))
-                    user_symbols[addr] = name
-                    print(f"✓ imported {name} at {addr:#x}")
                 else:
                     print(f"[!] Invalid line format: {line}")
-                # 设置断点
-                if len(parts) > 2 and parts[2] == '#bp':
-                    abs_addr = get_absolute_address(addr)
-                    gdb.execute(f'b *{hex(abs_addr)}')
-                    user_breakpoints[addr] = name
-                    print(f'✓ Breakpoint set at {name} (address 0x{abs_addr:x})')
     except Exception as e:
         print(f'[!] Failed to import: {e}')
 
