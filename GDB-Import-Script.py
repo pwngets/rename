@@ -146,8 +146,11 @@ def rename_import(file):
                     print(f"✓ imported {name} at {addr:#x}")
                 # 设置断点
                 elif len(parts) == 3 and parts[2] == '#bp':     #for addr+name+"#bp" format
+                    addr_str, name = parts[0], parts[1]
+                    addr = fix_address(int(addr_str, 0))
                     abs_addr = get_absolute_address(addr)
                     gdb.execute(f'b *{hex(abs_addr)}')
+                    user_symbols[addr] = name
                     user_breakpoints[addr] = name
                     print(f'✓ Breakpoint set at {name} (address 0x{abs_addr:x})')
                 elif len(parts) == 3 and parts[2] != '#bp':     #for start_str+end_str+name format
